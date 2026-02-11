@@ -57,3 +57,9 @@ class RemotePandaGripper(RemoteDevice):
     def send_gripper_command(self, width: float, speed: float = 0.01) -> None:
         """Send a gripper command."""
         self.command_publisher.publish(GraspCommand(width=width, speed=speed))
+
+    def start_control(self) -> None:
+        pyzlc.call(f"{self._name}/start_gripper_control", pyzlc.empty)
+
+    def stop_control(self) -> None:
+        pyzlc.call(f"{self._name}/stop_gripper_control", pyzlc.empty)

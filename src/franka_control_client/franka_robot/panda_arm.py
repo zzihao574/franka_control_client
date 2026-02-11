@@ -12,14 +12,14 @@ from ..core.remote_device import RemoteDevice
 
 
 class ControlMode(str, Enum):
-    IDLE = "IDLE"
+    IDLE = "Idle"
     HybridJointImpedance = "HybridJointImpedance"
     # JOINT_POSITION = "JointPosition"
     # JOINT_VELOCITY = "JointVelocity"
     # CARTESIAN_POSE = "CartesianPose"
     # CARTESIAN_VELOCITY = "CartesianVelocity"
     # JOINT_TORQUE = "JointTorque"
-    # GRAVITY_COMP = "GravityComp"
+    GRAVITYCOMP = "GravityComp"
 
 
 class PandaArmState(TypedDict):
