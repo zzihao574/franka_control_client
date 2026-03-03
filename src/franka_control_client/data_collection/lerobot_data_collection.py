@@ -31,6 +31,7 @@ class LeRobotDataCollection(DataCollectionManager):
             queue.Queue()
         )
         self.data_save_future: Optional[Future] = None
+        self._closed = False
 
     def _start_collecting(self) -> None:
         # Emit start-collection event (e.g., start control pair).
@@ -98,9 +99,9 @@ class LeRobotDataCollection(DataCollectionManager):
         super()._reset_to_waiting()
 
     def _close(self) -> None:
-        if self._close:
+        if self._closed:
             return
-        self._close = True
+        self._closed = True
 
         # Ensure the background saver thread can't hang on Queue.get() when exiting.
         if self.data_save_future is not None:
