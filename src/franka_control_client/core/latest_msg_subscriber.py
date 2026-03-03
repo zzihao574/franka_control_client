@@ -30,3 +30,4 @@ class LatestMsgSubscriber(Generic[MessageT]):
     def stop(self) -> None:
         """Stop the subscriber and cancel its running task."""
         raise NotImplementedError
+

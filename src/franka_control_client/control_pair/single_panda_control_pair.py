@@ -47,7 +47,7 @@ class SinglePandaKTControlPair(ControlPair):
         )
         self.follower.panda_arm.send_joint_position_command(align_q_np)
 
-        self.follower.panda_gripper.start_control()
+        # self.follower.panda_gripper.start_control()
 
         self.leader.panda_gripper.open(speed=GRIPPER_SPEED)
         self.follower.panda_gripper.open(speed=GRIPPER_SPEED)
@@ -78,4 +78,4 @@ class SinglePandaKTControlPair(ControlPair):
     def control_end(self) -> None:
         pyzlc.info("SinglePandaKTControlPair: control_end")
         self.leader.panda_arm.set_franka_arm_control_mode(ControlMode.GRAVITYCOMP)
-        self.follower.panda_arm.set_franka_arm_control_mode(ControlMode.GRAVITYCOMP)
+        self.follower.panda_arm.set_franka_arm_control_mode(ControlMode.HybridJointImpedance)

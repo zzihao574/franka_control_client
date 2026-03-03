@@ -77,12 +77,15 @@ class ImageDataWrapper(HardwareDataWrapper):
 
 
 class PandaArmDataWrapper(HardwareDataWrapper):
-    def __init__(self, arm: RemotePandaArm) -> None:
+    def __init__(self, arm: RemotePandaArm, include_action: bool = False) -> None:
         self.arm = arm
-        self.key = f"observation.state.q.{arm._name}"
+        self.obs_key = f"observation.state.q.{arm._name}"
+        self.action_key = f"action.q.{arm._name}" if include_action else None
         feature = {
-            self.key: {"dtype": "float32", "shape": (7,)},
+            self.obs_key: {"dtype": "float32", "shape": (7,)},
         }
+        if include_action:
+            feature[self.action_key] = {"dtype": "float32", "shape": (7,)}
         super().__init__(feature)
 
     def capture_step(self) -> Dict[str, np.ndarray]:
@@ -90,7 +93,10 @@ class PandaArmDataWrapper(HardwareDataWrapper):
         state = self.arm.current_state
         if state is None:
             raise ValueError("No arm state data received from the robot.")
-        return {self.key: np.array(state["q"], dtype=np.float32)}
+        result = {self.obs_key: np.array(state["q"], dtype=np.float32)}
+        if self.action_key is not None:
+            result[self.action_key] = np.array(state["q_d"], dtype=np.float32)
+        return result
 
     def __getattr__(self, name):
         return getattr(self.arm, name)
@@ -106,17 +112,23 @@ class PandaArmDataWrapper(HardwareDataWrapper):
 
 
 class PandaGripperDataWrapper(HardwareDataWrapper):
-    def __init__(self, gripper: RemotePandaGripper) -> None:
+    def __init__(self, gripper: RemotePandaGripper, include_action: bool = False) -> None:
         self.gripper = gripper
-        self.key = f"observation.state.gripper_width.{gripper._name}"
-        feature = {self.key: {"dtype": "float32", "shape": (1,)}}
+        self.obs_key = f"observation.state.gripper_width.{gripper._name}"
+        self.action_key = f"action.gripper_width.{gripper._name}" if include_action else None
+        feature = {self.obs_key: {"dtype": "float32", "shape": (1,)}}
+        if include_action:
+            feature[self.action_key] = {"dtype": "float32", "shape": (1,)}
         super().__init__(feature)
 
     def capture_step(self) -> Dict[str, np.ndarray]:
         state = self.gripper.current_state
         if state is None:
             raise ValueError("No gripper state data received from the robot.")
-        return {self.key: np.array([state["width"]], dtype=np.float32)}
+        result = {self.obs_key: np.array([state["width"]], dtype=np.float32)}
+        if self.action_key is not None:
+            result[self.action_key] = np.array([state["width"]], dtype=np.float32)
+        return result
 
     def discard(self) -> None:
         pass

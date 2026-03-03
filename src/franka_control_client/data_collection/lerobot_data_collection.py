@@ -83,6 +83,7 @@ class LeRobotDataCollection(DataCollectionManager):
         self._stop_collecting()
         for collector in self.data_collectors:
             collector.discard()
+        self.dataset.clear_episode_buffer(delete_images=True)
         self._ui_console.log("Episode discarded.")
 
     def _stop_collecting(self) -> None:

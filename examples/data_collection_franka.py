@@ -67,16 +67,16 @@ if __name__ == "__main__":
 
     control_pair = SinglePandaKTControlPair(leader, follower, align_q=ALIGN_Q)
 
-    # camera_centric = ImageDataWrapper(CameraDevice("centric_cam", preview=True))
-    # camera_wrist = ImageDataWrapper(CameraDevice("wrist_cam", preview=True))
+    camera_centric = ImageDataWrapper(CameraDevice("centric_cam", preview=True))
+    camera_wrist = ImageDataWrapper(CameraDevice("wrist_cam", preview=True))
 
     data_collectors: List[HardwareDataWrapper] = []
-    # data_collectors.append(camera_centric)
-    # data_collectors.append(camera_wrist)
+    data_collectors.append(camera_centric)
+    data_collectors.append(camera_wrist)
     data_collectors.append(PandaArmDataWrapper(leader.panda_arm))
     data_collectors.append(PandaGripperDataWrapper(leader.panda_gripper))
-    data_collectors.append(PandaArmDataWrapper(follower.panda_arm))
-    data_collectors.append(PandaGripperDataWrapper(follower.panda_gripper))
+    data_collectors.append(PandaArmDataWrapper(follower.panda_arm, include_action=True))
+    data_collectors.append(PandaGripperDataWrapper(follower.panda_gripper, include_action=True))
 
     name = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     data_collection_manager = LeRobotDataCollection(
