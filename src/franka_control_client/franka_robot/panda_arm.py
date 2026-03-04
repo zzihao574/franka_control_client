@@ -138,7 +138,7 @@ class RemotePandaArm(RemoteDevice):
     def set_franka_arm_control_mode(self, mode: ControlMode) -> None:
         """Set the control mode of the Franka arm."""
         pyzlc.call(f"{self._name}/set_franka_arm_control_mode", mode.value)
-        print(f"Set Franka arm control mode to {mode.value}")
+        pyzlc.info(f"Set Franka arm control mode to {mode.value}")
 
     def move_franka_arm_to_joint_position(
         self, joint_positions: Tuple[float, ...]
