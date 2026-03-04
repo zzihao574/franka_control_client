@@ -17,7 +17,7 @@ class LeRobotDataCollection(DataCollectionManager):
         data_collectors: List[HardwareDataWrapper],
         data_dir: str,
         task: str,
-        fps: int = 50,
+        fps: int = 30,
     ) -> None:
         super().__init__(data_collectors, task, fps)
         features = {}
@@ -61,19 +61,15 @@ class LeRobotDataCollection(DataCollectionManager):
             pyzlc.error(f"Error in data saving task: {e}")
 
     def _collect_step(self) -> None:
-        if self.last_timestamp is None:
-            self.last_timestamp = time.perf_counter()
+        step_start = time.perf_counter()
         payload = {}
         for collector in self.data_collectors:
             payload.update(collector.capture_step())
         payload["task"] = self.task
         self.data_save_queue.put(payload)
-        self.last_timestamp = time.perf_counter()
-        sleep_time = max(
-            0, 1.0 / self.fps - (time.perf_counter() - self.last_timestamp)
-        )
+        elapsed = time.perf_counter() - step_start
+        sleep_time = max(0.0, 1.0 / self.fps - elapsed)
         time.sleep(sleep_time)
-        self.last_timestamp = time.perf_counter()
 
     def _save_episode(self) -> None:
         self._stop_collecting()
