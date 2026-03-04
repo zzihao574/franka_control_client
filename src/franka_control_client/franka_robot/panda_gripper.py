@@ -31,6 +31,7 @@ class RemotePandaGripper(RemoteDevice):
         self.state_subscriber = LatestMsgSubscriber(
             f"{self._name}/franka_gripper_state"
         )
+        self._last_gripper_command: Optional[GraspCommand] = None
 
     @property
     def current_state(self) -> Optional[GripperStateMsg]:
@@ -56,7 +57,16 @@ class RemotePandaGripper(RemoteDevice):
 
     def send_gripper_command(self, width: float, speed: float = 0.01) -> None:
         """Send a gripper command."""
-        self.command_publisher.publish(GraspCommand(width=width, speed=speed))
+        self._last_gripper_command = GraspCommand(
+            width=float(width),
+            speed=float(speed),
+        )
+        self.command_publisher.publish(self._last_gripper_command)
+
+    @property
+    def last_gripper_command(self) -> Optional[GraspCommand]:
+        """Return the latest commanded gripper action that was published."""
+        return self._last_gripper_command
 
     def start_control(self) -> None:
         pyzlc.call(f"{self._name}/start_gripper_control", pyzlc.empty)

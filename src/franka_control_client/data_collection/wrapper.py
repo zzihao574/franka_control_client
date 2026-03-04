@@ -95,7 +95,12 @@ class PandaArmDataWrapper(HardwareDataWrapper):
             raise ValueError("No arm state data received from the robot.")
         result = {self.obs_key: np.array(state["q"], dtype=np.float32)}
         if self.action_key is not None:
-            result[self.action_key] = np.array(state["q_d"], dtype=np.float32)
+            command = self.arm.last_joint_position_command
+            if command is None:
+                # no command yet; record a placeholder value
+                result[self.action_key] = np.zeros((7,), dtype=np.float32)
+            else:
+                result[self.action_key] = np.array(command, dtype=np.float32)
         return result
 
     def __getattr__(self, name):
@@ -127,7 +132,14 @@ class PandaGripperDataWrapper(HardwareDataWrapper):
             raise ValueError("No gripper state data received from the robot.")
         result = {self.obs_key: np.array([state["width"]], dtype=np.float32)}
         if self.action_key is not None:
-            result[self.action_key] = np.array([state["width"]], dtype=np.float32)
+            command = self.gripper.last_gripper_command
+            if command is None:
+                # no command yet; record a placeholder value
+                result[self.action_key] = np.zeros((1,), dtype=np.float32)
+            else:
+                result[self.action_key] = np.array(
+                    [command["width"]], dtype=np.float32
+                )
         return result
 
     def discard(self) -> None:

@@ -30,21 +30,13 @@ class SinglePandaKTControlPair(ControlPair):
         self._align_q = tuple(float(v) for v in align_q)
 
     def control_rest(self) -> None:
-
-        # Prime follower desired q before/after switching to Hybrid
+        # Arm reset: IDLE -> move align_q
         align_q_np = np.asarray(self._align_q, dtype=np.float64)
         self.follower.panda_arm.send_joint_position_command(align_q_np)
         self.leader.panda_arm.set_franka_arm_control_mode(ControlMode.GRAVITYCOMP)
         self.follower.panda_arm.set_franka_arm_control_mode(
             ControlMode.HybridJointImpedance
         )
-        self.follower.panda_arm.send_joint_position_command(align_q_np)
-
-        self.follower.panda_gripper.start_control()
-
-        # self.leader.panda_gripper.open(speed=GRIPPER_SPEED)
-        # self.follower.panda_gripper.open(speed=GRIPPER_SPEED)
-        pyzlc.sleep(0.8)
 
     def control_step(self) -> None:
         leader_arm_state = self.leader.panda_arm.current_state
@@ -70,11 +62,15 @@ class SinglePandaKTControlPair(ControlPair):
 
     def control_end(self) -> None:
         pyzlc.info("SinglePandaKTControlPair: control_end")
-        # Arm reset: IDLE -> move align_q
         self.leader.panda_arm.set_franka_arm_control_mode(ControlMode.IDLE)
         self.follower.panda_arm.set_franka_arm_control_mode(ControlMode.IDLE)
 
         self.leader.panda_arm.move_franka_arm_to_joint_position(self._align_q)
         self.follower.panda_arm.move_franka_arm_to_joint_position(self._align_q)
-        self.leader.panda_arm.set_franka_arm_control_mode(ControlMode.GRAVITYCOMP)
-        self.follower.panda_arm.set_franka_arm_control_mode(ControlMode.HybridJointImpedance)
+
+        self.follower.panda_gripper.send_gripper_command(
+                width=0.07,
+                speed=GRIPPER_SPEED,
+            )
+
+

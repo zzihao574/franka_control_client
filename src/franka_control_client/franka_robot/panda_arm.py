@@ -103,6 +103,7 @@ class RemotePandaArm(RemoteDevice):
         self.joint_torque_publisher = pyzlc.Publisher(
             f"{robot_name}/joint_torque_command"
         )
+        self._last_joint_position_command: Optional[List[float]] = None
 
     def connect(self) -> None:
         """
@@ -194,9 +195,17 @@ class RemotePandaArm(RemoteDevice):
         arr = np.asarray(joint_positions, dtype=np.float64).reshape(-1)
         if arr.size != 7:
             raise ValueError(f"Expected 7 joint angles, got {arr.size}")
+        self._last_joint_position_command = arr.tolist()
         self.joint_position_publisher.publish(
             JointPositionCommand(pos=arr.tolist())
         )
+
+    @property
+    def last_joint_position_command(self) -> Optional[List[float]]:
+        """
+        Return the latest commanded joint position that was published.
+        """
+        return self._last_joint_position_command
 
     def send_cartesian_pose_command(self, pose) -> None:
         """

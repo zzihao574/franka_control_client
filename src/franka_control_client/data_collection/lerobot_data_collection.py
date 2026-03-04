@@ -87,14 +87,13 @@ class LeRobotDataCollection(DataCollectionManager):
         self.dataset.clear_episode_buffer(delete_images=True)
         self._ui_console.log("Episode discarded.")
 
-    def _stop_collecting(self) -> None:
-        # Emit stop-collection event (e.g., stop control pair) first.
-        super()._stop_collecting()
+    def _stop_collecting(self) -> None: 
         assert self.data_save_future is not None
         self.data_save_queue.put(None)  # signal to stop saving
         self.data_save_future.result()  # wait for saving to complete
         self.data_save_future = None
-
+        super()._stop_collecting()
+        
     def _reset_to_waiting(self) -> None:
         super()._reset_to_waiting()
 

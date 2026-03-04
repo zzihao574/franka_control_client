@@ -23,6 +23,7 @@ from franka_control_client.franka_robot.franka_panda import (
 from franka_control_client.control_pair.single_panda_control_pair import (
     SinglePandaKTControlPair,
 )
+from franka_control_client.franka_robot.panda_arm import ControlMode
 
 ZLC_IP = "141.3.53.63"
 GROUP = "224.0.0.1"
@@ -89,6 +90,19 @@ if __name__ == "__main__":
     data_collection_manager.register_stop_collecting_event(
         control_pair.stop_control_pair
     )
+
+    leader.panda_arm.set_franka_arm_control_mode(ControlMode.IDLE)
+    follower.panda_arm.set_franka_arm_control_mode(ControlMode.IDLE)
+
+    leader.panda_arm.move_franka_arm_to_joint_position(ALIGN_Q)
+    follower.panda_arm.move_franka_arm_to_joint_position(ALIGN_Q)
+    
+    follower.panda_gripper.start_control()
+    leader.panda_gripper.stop_control()
+    follower.panda_gripper.send_gripper_command(
+                width=0.07,
+                speed=0.5,
+            )
 
     data_collection_manager.run()
     pyzlc.shutdown()
