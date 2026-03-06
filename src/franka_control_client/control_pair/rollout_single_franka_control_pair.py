@@ -32,10 +32,10 @@ class RolloutSingleFrankaControlPair(ControlPair):
         self._latest_action: Optional[np.ndarray] = None
 
     def update_action(self, action: np.ndarray) -> None:
+        action_arr = np.asarray(action, dtype=np.float64).reshape(-1)
         if action_arr.size != 8:
             pyzlc.error(f"Invalid action size: {action_arr.size}, expected 8")
             return
-        action_arr = np.asarray(action, dtype=np.float64).reshape(-1)
         with self._action_lock:
             self._latest_action = action_arr
 
