@@ -12,7 +12,7 @@ from franka_control_client.control_pair.rollout_single_franka_control_pair impor
     RolloutSingleFrankaControlPair,
 )
 from franka_control_client.franka_robot.franka_panda import FrankaPanda
-from franka_control_client.franka_robot.panda_arm import RemotePandaArm
+from franka_control_client.franka_robot.panda_arm import RemotePandaArm, ControlMode
 from franka_control_client.franka_robot.panda_gripper import RemotePandaGripper
 from franka_control_client.policy_inference.franka_beso_rollout_manager import (
     FrankaBesoRolloutConfig,
@@ -94,6 +94,13 @@ def main() -> None:
     )
     manager.register_start_rollout_event(control_pair.start_control_pair)
     manager.register_stop_rollout_event(control_pair.stop_control_pair)
+
+    follower.panda_arm.set_franka_arm_control_mode(ControlMode.IDLE)
+    follower.panda_arm.move_franka_arm_to_joint_position(cfg["align_q"])
+    follower.panda_gripper.start_control()
+    follower.panda_gripper.send_gripper_command(
+        width=0.07, speed=0.5
+    )
 
     try:
         manager.run()

@@ -1,11 +1,11 @@
 policy_node:
-  lerobot_repo_root: /home/zzh/workspace/Robot_learning/lerobot-irl-models
-  checkpoint_path: /home/zzh/workspace/Robot_learning/lerobot-irl-models/outputs/train/2026-03-05/15-25-30_beso/checkpoints/001000/pretrained_model
-  stats_data_dir: /home/zzh/workspace/Robot_learning/lerobot-irl-models/data/banana_beso_all
-  dataset_repo_id: /home/zzh/workspace/Robot_learning/lerobot-irl-models/data/banana_beso_all
+  lerobot_repo_root: /home/multimodallearning/Jing/lerobot-irl-models
+  checkpoint_path: /home/multimodallearning/Jing/lerobot-irl-models/outputs/030000/pretrained_model
+  stats_data_dir: /home/multimodallearning/Jing/lerobot-irl-models/data/banana_beso_all
+  dataset_repo_id: /home/multimodallearning/Jing/lerobot-irl-models/data/banana_beso_all
   device: cuda
   use_non_ema: false
-  sampling_steps: 5
+  sampling_steps: 10
   obs_topic: beso/observation
   action_topic: beso/action
   fps: 30.0
@@ -13,7 +13,7 @@ policy_node:
   pyzlc_host: 141.3.53.25
   pyzlc_group: 224.0.0.1
   pyzlc_group_name: realrobot_rollout
-  pyzlc_group_port: 7730
+  pyzlc_group_port: 7731
   seed: 42
 
 rollout_node:
@@ -21,13 +21,13 @@ rollout_node:
   pyzlc_host: 141.3.53.25
   pyzlc_group: 224.0.0.1
   pyzlc_group_name: realrobot_rollout
-  pyzlc_group_port: 7730
+  pyzlc_group_port: 7731
 
   policy_name: beso
   obs_topic: beso/observation
   action_topic: beso/action
   task: ""
-  fps: 30
+  fps: 30.0
 
   follower_arm: FrankaFollower
   follower_gripper: FrankaFollowerGripper

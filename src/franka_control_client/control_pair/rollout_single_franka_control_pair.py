@@ -57,7 +57,6 @@ class RolloutSingleFrankaControlPair(ControlPair):
         self.follower.panda_arm.set_franka_arm_control_mode(
             ControlMode.HybridJointImpedance
         )
-        self.follower.panda_gripper.start_control()
 
     def control_step(self) -> None:
         action = self._get_latest_action()

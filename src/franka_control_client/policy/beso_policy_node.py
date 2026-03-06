@@ -141,7 +141,7 @@ class BesoPolicyNode:
 
             if key.startswith("observation.image."):
                 cam_name = key.replace("observation.image.", "", 1)
-                rgb = self._decode_image(images[cam_name])
+                rgb = self._decode_image(images[cam_name]).astype(np.float32) / 255.0
                 chw = np.transpose(rgb, (2, 0, 1)).copy()
                 batch[key] = torch.from_numpy(chw).unsqueeze(0).to(self.device)
                 continue
