@@ -32,6 +32,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser = argparse.ArgumentParser("Franka BESO rollout (GPU machine)")
     parser.add_argument("--config", type=str, default=str(default_cfg))
+    parser.add_argument(
+        "--record_enable",
+        action="store_true",
+        default=None,
+        help="Enable rollout data recording in LeRobot format.",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +49,9 @@ def _load_cfg(path: str) -> dict[str, Any]:
 def main() -> None:
     args = _parse_args()
     cfg = _load_cfg(args.config)
+    record_enable = bool(cfg.get("record_enable", False))
+    if args.record_enable:
+        record_enable = True
 
     pyzlc.init(
         cfg["pyzlc_name"],
@@ -86,6 +95,7 @@ def main() -> None:
         fps=int(cfg["fps"]),
         obs_topic=cfg["obs_topic"],
         action_topic=cfg["action_topic"],
+        record_enable=record_enable,
     )
     manager = FrankaBesoRolloutManager(
         obs_sources=obs_sources,

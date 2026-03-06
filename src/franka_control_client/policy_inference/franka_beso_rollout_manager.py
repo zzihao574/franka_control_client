@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import queue
 import time
+from concurrent.futures import Future
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -19,6 +22,10 @@ from ..control_pair.rollout_single_franka_control_pair import (
     RolloutSingleFrankaControlPair,
 )
 from ..policy.policy import RemotePolicy
+
+RECORD_DATA_DIR = str(
+    (Path(__file__).resolve().parents[3] / "data" / "beso_rollout_records").resolve()
+)
 
 
 class RolloutState(str, Enum):
@@ -82,6 +89,7 @@ class FrankaBesoRolloutConfig:
     fps: int = 30
     obs_topic: Optional[str] = None
     action_topic: Optional[str] = None
+    record_enable: bool = False
 
 
 class FrankaBesoRolloutManager:
@@ -148,6 +156,11 @@ class FrankaBesoRolloutManager:
         self._last_action_ts = 0.0
         self._closed = False
 
+        self._record_enable = bool(cfg.record_enable)
+        self._dataset = None
+        self._save_queue: queue.Queue[Optional[Dict[str, Any]]] = queue.Queue()
+        self._save_future: Optional[Future] = None
+
     def register_start_rollout_event(self, handler: Callable[[], None]) -> None:
         self._start_rollout_event.subscribe(handler)
 
@@ -194,25 +207,36 @@ class FrankaBesoRolloutManager:
         self._need_policy_reset = True
         self._rollout_start_wall_ts = time.time()
         self._last_action_ts = self._rollout_start_wall_ts
+        self._start_recording_episode()
         self._start_rollout_event.emit()
 
     def _end_rollout(self) -> None:
         self._ui_console.update_hint("Stopping rollout...")
         self._stop_rollout_event.emit()
+        self._stop_recording_episode(save_episode=True)
         self._ui_console.log("Rollout ended.")
 
     def _close(self) -> None:
         if self._closed:
             return
         self._closed = True
-        self._stop_rollout_event.emit()
+        if self.control_pair.is_running:
+            self._stop_rollout_event.emit() 
+        self._stop_recording_episode(save_episode=False)
+        self._finalize_recorder()
         self._ui_console.update_hint("Rollout manager closed.")
 
     def _rollout_step(self) -> None:
         if self.last_timestamp is None:
             self.last_timestamp = time.perf_counter()
 
-        obs = self._build_observation(reset_policy=self._need_policy_reset)
+        state_vec = self._build_state_vector()
+        image_arrays = self._capture_image_arrays()
+        obs = self._build_observation(
+            state_vec=state_vec,
+            image_arrays=image_arrays,
+            reset_policy=self._need_policy_reset,
+        )
         self._need_policy_reset = False
         self.policy.send_observation(obs)
 
@@ -222,6 +246,7 @@ class FrankaBesoRolloutManager:
             if action_ts >= self._rollout_start_wall_ts and action_ts >= self._last_action_ts:
                 action = np.asarray(action_msg["action"], dtype=np.float64).reshape(-1)
                 self.control_pair.update_action(action)
+                self._record_step(state_vec, image_arrays, action)
                 self._last_action_ts = action_ts
 
         elapsed = time.perf_counter() - self.last_timestamp
@@ -230,10 +255,15 @@ class FrankaBesoRolloutManager:
             pyzlc.sleep(sleep_time)
         self.last_timestamp = time.perf_counter()
 
-    def _build_observation(self, reset_policy: bool) -> Dict[str, Any]:
+    def _build_observation(
+        self,
+        state_vec: np.ndarray,
+        image_arrays: Dict[str, np.ndarray],
+        reset_policy: bool,
+    ) -> Dict[str, Any]:
         return {
-            "state": self._build_state_vector().tolist(),
-            "images": self._build_images(),
+            "state": state_vec.tolist(),
+            "images": self._encode_images_for_policy(image_arrays),
             "task": self.cfg.task,
             "reset_policy": reset_policy,
         }
@@ -247,17 +277,107 @@ class FrankaBesoRolloutManager:
 
         return np.concatenate([q, np.asarray([gripper_width], dtype=np.float32)])
 
-    def _build_images(self) -> Dict[str, Any]:
-        images: Dict[str, Any] = {}
+    def _capture_image_arrays(self) -> Dict[str, np.ndarray]:
+        images: Dict[str, np.ndarray] = {}
         for cam in self.cameras:
             frame = cam.capture_step()
-            if frame is None:
-                continue
+            images[cam.hw_name] = frame
+        return images
+
+    def _encode_images_for_policy(self, image_arrays: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        images: Dict[str, Any] = {}
+        for cam_name, frame in image_arrays.items():
             h, w, c = frame.shape
-            images[cam.hw_name] = {
+            images[cam_name] = {
                 "height": int(h),
                 "width": int(w),
                 "channels": int(c),
                 "rgb_data": frame.tobytes(),
             }
         return images
+
+    def _build_record_features(self) -> Dict[str, Dict[str, Any]]:
+        features: Dict[str, Dict[str, Any]] = {
+            "observation.state": {"dtype": "float32", "shape": (8,)},
+            "action": {"dtype": "float32", "shape": (8,)},
+        }
+        for cam in self.cameras:
+            h, w = cam.camera_device.size
+            features[f"observation.image.{cam.hw_name}"] = {
+                "dtype": "video",
+                "shape": (h, w, 3),
+            }
+        return features
+
+    def _init_recorder_if_needed(self) -> None:
+        if not self._record_enable or self._dataset is not None:
+            return
+        from lerobot.datasets.lerobot_dataset import LeRobotDataset
+
+        Path(RECORD_DATA_DIR).mkdir(parents=True, exist_ok=True)
+        features = self._build_record_features()
+        self._dataset = LeRobotDataset.create(
+            repo_id=RECORD_DATA_DIR,
+            features=features,
+            fps=self.fps,
+        )
+        self._dataset.meta.metadata_buffer_size = 1
+
+    def _start_recording_episode(self) -> None:
+        if not self._record_enable:
+            return
+        self._init_recorder_if_needed()
+        if self._save_future is not None:
+            return
+        while not self._save_queue.empty():
+            self._save_queue.get()
+        self._save_future = pyzlc.submit_thread_pool_task(self._save_data_task)
+
+    def _stop_recording_episode(self, save_episode: bool) -> None:
+        if not self._record_enable or self._save_future is None:
+            return
+        self._save_queue.put(None)
+        self._save_future.result()
+        self._save_future = None
+        if save_episode and self._dataset is not None:
+            self._dataset.save_episode()
+
+    def _finalize_recorder(self) -> None:
+        if not self._record_enable or self._dataset is None:
+            return
+        self._dataset.finalize()
+
+    def _save_data_task(self) -> None:
+        while True:
+            frame = self._save_queue.get()
+            if frame is None:
+                break
+            self._dataset.add_frame(frame)
+
+    def _build_record_frame(
+        self,
+        state_vec: np.ndarray,
+        image_arrays: Dict[str, np.ndarray],
+        action: np.ndarray,
+    ) -> Dict[str, Any]:
+        frame: Dict[str, Any] = {
+            "observation.state": np.asarray(state_vec, dtype=np.float32).reshape(-1),
+            "action": np.asarray(action, dtype=np.float32).reshape(-1),
+            "task": self.cfg.task,
+        }
+        for cam_name, image in image_arrays.items():
+            frame[f"observation.image.{cam_name}"] = image
+        return frame
+
+    def _record_step(
+        self,
+        state_vec: np.ndarray,
+        image_arrays: Dict[str, np.ndarray],
+        action: np.ndarray,
+    ) -> None:
+        if not self._record_enable or self._save_future is None:
+            return
+        if action.size != 8:
+            return
+        frame = self._build_record_frame(state_vec, image_arrays, action)
+        self._save_queue.put(frame)

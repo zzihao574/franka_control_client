@@ -26,6 +26,7 @@ rollout_node:
   policy_name: beso
   obs_topic: beso/observation
   action_topic: beso/action
+  record_enable: false
   task: ""
   fps: 30.0
 
