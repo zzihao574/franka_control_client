@@ -23,7 +23,7 @@ from ..control_pair.rollout_single_franka_control_pair import (
 )
 from ..policy.policy import RemotePolicy
 
-RECORD_DATA_DIR = str(
+RECORD_DATA_ROOT = str(
     (Path(__file__).resolve().parents[3] / "data" / "beso_rollout_records").resolve()
 )
 
@@ -160,6 +160,7 @@ class FrankaBesoRolloutManager:
         self._dataset = None
         self._save_queue: queue.Queue[Optional[Dict[str, Any]]] = queue.Queue()
         self._save_future: Optional[Future] = None
+        self._record_run_dir: Optional[str] = None
 
     def register_start_rollout_event(self, handler: Callable[[], None]) -> None:
         self._start_rollout_event.subscribe(handler)
@@ -312,16 +313,23 @@ class FrankaBesoRolloutManager:
     def _init_recorder_if_needed(self) -> None:
         if not self._record_enable or self._dataset is not None:
             return
+
         from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-        Path(RECORD_DATA_DIR).mkdir(parents=True, exist_ok=True)
+        record_root = Path(RECORD_DATA_ROOT)
+        record_root.mkdir(parents=True, exist_ok=True)
+
+        record_dir = record_root / str(time.time_ns())
         features = self._build_record_features()
+
         self._dataset = LeRobotDataset.create(
-            repo_id=RECORD_DATA_DIR,
+            repo_id=str(record_dir),
             features=features,
             fps=self.fps,
         )
         self._dataset.meta.metadata_buffer_size = 1
+        pyzlc.info(f"Recording dataset dir: {record_dir}")
+
 
     def _start_recording_episode(self) -> None:
         if not self._record_enable:
