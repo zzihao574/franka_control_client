@@ -14,11 +14,11 @@ class UIConsole:
     transient interactive hints using ANSI escape sequences.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._current_hint = ""
         self._lock = threading.Lock()
 
-    def update_hint(self, message: str):
+    def update_hint(self, message: str) -> None:
         """
         Updates the bottom interactive instruction.
         This will be overwritten by the next hint or pushed down by a log.
@@ -30,7 +30,7 @@ class UIConsole:
             sys.stdout.write(f"\r\033[K{self._current_hint}")
             sys.stdout.flush()
 
-    def log(self, message: str):
+    def log(self, message: str) -> None:
         """
         Prints a persistent log message that scrolls upward.
         Automatically restores the current hint at the bottom.
@@ -45,21 +45,21 @@ class UIConsole:
             sys.stdout.flush()
 
 
-class NonBlockingKeyPress(object):
+class NonBlockingKeyPress:
     """
     This class was copied and adapted from: https://stackoverflow.com/a/10079805
     Note that this solution is sometimes confused when spamming a character and that there are problems with special characters such as arrow keys.
     """
 
-    def __enter__(self):
+    def __enter__(self) -> "NonBlockingKeyPress":
         self.old_settings = termios.tcgetattr(sys.stdin)
         tty.setcbreak(sys.stdin.fileno())
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type, value, traceback) -> None:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
 
-    def get_data(self):
+    def get_data(self) -> str | bool:
         if select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], []):
             # Read one character
             data = sys.stdin.read(1)

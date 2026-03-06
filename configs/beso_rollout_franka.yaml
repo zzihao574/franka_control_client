@@ -1,0 +1,41 @@
+policy_node:
+  lerobot_repo_root: /home/zzh/workspace/Robot_learning/lerobot-irl-models
+  checkpoint_path: /home/zzh/workspace/Robot_learning/lerobot-irl-models/outputs/train/2026-03-05/15-25-30_beso/checkpoints/001000/pretrained_model
+  stats_data_dir: /home/zzh/workspace/Robot_learning/lerobot-irl-models/data/banana_beso_all
+  dataset_repo_id: /home/zzh/workspace/Robot_learning/lerobot-irl-models/data/banana_beso_all
+  device: cuda
+  use_non_ema: false
+  sampling_steps: 5
+  obs_topic: beso/observation
+  action_topic: beso/action
+  fps: 30.0
+  pyzlc_name: beso_policy_node
+  pyzlc_host: 141.3.53.25
+  pyzlc_group: 224.0.0.1
+  pyzlc_group_name: realrobot_rollout
+  pyzlc_group_port: 7730
+  seed: 42
+
+rollout_node:
+  pyzlc_name: franka_rollout_node
+  pyzlc_host: 141.3.53.25
+  pyzlc_group: 224.0.0.1
+  pyzlc_group_name: realrobot_rollout
+  pyzlc_group_port: 7730
+
+  policy_name: beso
+  obs_topic: beso/observation
+  action_topic: beso/action
+  task: ""
+  fps: 30
+
+  follower_arm: FrankaFollower
+  follower_gripper: FrankaFollowerGripper
+  camera_names:
+    - centric_cam
+    - wrist_cam
+  camera_preview: false
+
+  control_dt_s: 0.01
+  gripper_speed: 0.5
+  align_q: [-0.838027175526648, 0.23739903886903796, 0.998479903707504, -1.9307362981093554, -0.1399801990323587, 2.0812839427259235, 1.0100087088974428]

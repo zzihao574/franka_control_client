@@ -1,12 +1,9 @@
 import abc
-import time
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
-import cv2
 import numpy as np
 
 from ..camera.camera import CameraDevice
-from ..core.latest_msg_subscriber import LatestMsgSubscriber
 from ..franka_robot.panda_arm import RemotePandaArm
 from ..franka_robot.panda_gripper import RemotePandaGripper
 from ..robotiq_gripper.robotiq_gripper import RemoteRobotiqGripper
@@ -38,10 +35,16 @@ class IRL_HardwareDataWrapper(abc.ABC):
 
 
 class ImageDataWrapper(IRL_HardwareDataWrapper):
-    def __init__(self, camera_device: CameraDevice,hw_name:str , hw_type:str = "camera",capture_interval:int = 0.033) -> None:
+    def __init__(
+        self,
+        camera_device: CameraDevice,
+        hw_name: str,
+        hw_type: str = "camera",
+        capture_interval: float = 0.033,
+    ) -> None:
         self.camera_device = camera_device
         self.capture_interval = capture_interval
-        super().__init__(hw_type,hw_name)
+        super().__init__(hw_type, hw_name)
 
     def capture_step(self) -> Optional[np.ndarray]:
         # Implement the logic to save image data from the camera device
@@ -76,9 +79,14 @@ class ImageDataWrapper(IRL_HardwareDataWrapper):
 
 
 class PandaArmDataWrapper(IRL_HardwareDataWrapper):
-    def __init__(self, arm: RemotePandaArm,hw_name:str = "FrankaPanda" , hw_type:str = "follower_arm") -> None:
+    def __init__(
+        self,
+        arm: RemotePandaArm,
+        hw_name: str = "FrankaPanda",
+        hw_type: str = "follower_arm",
+    ) -> None:
         self.arm = arm
-        super().__init__(hw_type,hw_name)
+        super().__init__(hw_type, hw_name)
 
     def capture_step(self) -> Dict[str, np.ndarray]:
         # Implement the logic to save robot state data
@@ -108,9 +116,14 @@ class PandaArmDataWrapper(IRL_HardwareDataWrapper):
 
 
 class PandaGripperDataWrapper(IRL_HardwareDataWrapper):
-    def __init__(self, gripper: RemotePandaGripper,hw_name:str = "FrankaPanda" , hw_type:str = "follower_gripper") -> None:
+    def __init__(
+        self,
+        gripper: RemotePandaGripper,
+        hw_name: str = "FrankaPanda",
+        hw_type: str = "follower_gripper",
+    ) -> None:
         self.gripper = gripper
-        super().__init__(hw_type,hw_name)
+        super().__init__(hw_type, hw_name)
 
     def capture_step(self) -> Dict[str, np.ndarray]:
         state = self.gripper.current_state
@@ -133,11 +146,19 @@ class PandaGripperDataWrapper(IRL_HardwareDataWrapper):
     def close(self) -> None:
         pass
 
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.gripper, name)
+
 
 class RobotiqGripperDataWrapper(IRL_HardwareDataWrapper):
-    def __init__(self, gripper: RemoteRobotiqGripper,hw_name:str = "FrankaPanda" , hw_type:str = "follower_gripper") -> None:
+    def __init__(
+        self,
+        gripper: RemoteRobotiqGripper,
+        hw_name: str = "FrankaPanda",
+        hw_type: str = "follower_gripper",
+    ) -> None:
         self.gripper = gripper
-        super().__init__(hw_type,hw_name)
+        super().__init__(hw_type, hw_name)
 
     def capture_step(self) -> Dict[str, np.ndarray]:
         state = self.gripper.current_state
@@ -166,5 +187,5 @@ class RobotiqGripperDataWrapper(IRL_HardwareDataWrapper):
     def close(self) -> None:
         pass
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self.gripper, name)

@@ -49,8 +49,8 @@ class ControlPair(abc.ABC):
 
     def _control_task(self) -> None:
         try:
-            # pyzlc.info("Resetting...")
-            # self.control_rest()
+            pyzlc.info("Resetting...")
+            self.control_rest()
             # pyzlc.sleep(1)
             while self.is_running:
                 self.control_step()
