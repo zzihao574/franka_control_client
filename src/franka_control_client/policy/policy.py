@@ -1,26 +1,29 @@
 from __future__ import annotations
 
-import time
-from typing import TypedDict, Optional, Dict, Any
+from typing import Any, Optional, TypedDict
+
 import pyzlc
 
 from ..core.remote_device import RemoteDevice
 from ..core.latest_msg_subscriber import LatestMsgSubscriber
 
-#build connection for inference node with policy node
-DEFAULT_INIT_ACTION = [0.0, 0.0, 0.0, -2.15, 0.0, 2.15, 0.0, 0.0]
-
-
 class PolicyActionMsg(TypedDict, total=True):
+    rollout_id: int
+    source_obs_seq: int
     timestamp: float
     action: list[float]
     shape: list[int]
 
 
 class PolicyObservationMsg(TypedDict, total=True):
+    rollout_id: int
+    obs_seq: int
+    obs_timestamp: float
     state: list[float]
-    images: Dict[str, Any]
+    images: dict[str, Any]
     task: str | None
+    reset_policy: bool
+
 
 class RemotePolicy(RemoteDevice):
     """Remote client for a policy node."""
@@ -42,11 +45,6 @@ class RemotePolicy(RemoteDevice):
         self.action_subscriber = LatestMsgSubscriber(
             action_topic,
             wait_for_first_message=False,
-            initial_message=PolicyActionMsg(
-                timestamp=time.time(),
-                action=DEFAULT_INIT_ACTION,
-                shape=[len(DEFAULT_INIT_ACTION)],
-            ),
         )
 
     @property
@@ -56,11 +54,13 @@ class RemotePolicy(RemoteDevice):
         if msg is None:
             return None
         return PolicyActionMsg(
+            rollout_id=int(msg["rollout_id"]),
+            source_obs_seq=int(msg["source_obs_seq"]),
             timestamp=msg["timestamp"],
             action=msg["action"],
             shape=msg["shape"],
         )
-    #if put this in policy node, directly get observations,policy part need few of subscriber, if put here just need one subscriber，maybe save time fore policy_node
+
     def send_observation(self, obs: PolicyObservationMsg) -> None:
         """Send observation."""
         self.obs_publisher.publish(obs)

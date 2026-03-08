@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import random
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,7 +41,6 @@ class BesoPolicyNodeConfig:
     sampling_steps: int | None
     obs_topic: str
     action_topic: str
-    fps: float
     pyzlc_name: str
     pyzlc_host: str
     pyzlc_group: str
@@ -51,8 +52,11 @@ class BesoPolicyNodeConfig:
 class BesoPolicyNode:
     def __init__(self, cfg: BesoPolicyNodeConfig) -> None:
         self.cfg = cfg
-        self._latest_obs: dict[str, Any] | None = None
         self._running = False
+        self._obs_queue: queue.Queue[dict[str, Any] | None] = queue.Queue()
+        self._obs_seq_lock = threading.Lock()
+        self._active_rollout_id: int | None = None
+        self._last_enqueued_obs_seq: int | None = None
 
         pyzlc.init(
             self.cfg.pyzlc_name,
@@ -67,8 +71,32 @@ class BesoPolicyNode:
         self.policy, self.device = self._load_policy()
         self.policy.reset()
 
+    def _clear_pending_observations(self) -> None:
+        saw_stop_sentinel = False
+        while True:
+            try:
+                item = self._obs_queue.get_nowait()
+            except queue.Empty:
+                break
+            if item is None:
+                saw_stop_sentinel = True
+        if saw_stop_sentinel:
+            self._obs_queue.put(None)
+
     def _on_observation(self, msg: dict[str, Any]) -> None:
-        self._latest_obs = msg
+        rollout_id = int(msg["rollout_id"])
+        obs_seq = int(msg["obs_seq"])
+        with self._obs_seq_lock:
+            if self._active_rollout_id is None or rollout_id > self._active_rollout_id:
+                self._active_rollout_id = rollout_id
+                self._last_enqueued_obs_seq = None
+                self._clear_pending_observations()
+            elif rollout_id < self._active_rollout_id:
+                return
+            if self._last_enqueued_obs_seq is not None and obs_seq <= self._last_enqueued_obs_seq:
+                return
+            self._last_enqueued_obs_seq = obs_seq
+        self._obs_queue.put(msg)
 
     def _decode_image(self, img: Any) -> np.ndarray:
         if isinstance(img, np.ndarray):
@@ -156,12 +184,9 @@ class BesoPolicyNode:
 
         return batch
 
-    def step(self) -> None:
-        if self._latest_obs is None:
-            return
-
-        obs_msg = self._latest_obs
-
+    def _process_observation(self, obs_msg: dict[str, Any]) -> None:
+        rollout_id = int(obs_msg["rollout_id"])
+        obs_seq = int(obs_msg["obs_seq"])
         if bool(obs_msg.get("reset_policy", False)):
             self.policy.reset()
 
@@ -172,6 +197,8 @@ class BesoPolicyNode:
 
         action_vec = action[0] if action.ndim == 2 else action
         payload = {
+            "rollout_id": rollout_id,
+            "source_obs_seq": obs_seq,
             "timestamp": time.time(),
             "action": action_vec.detach().cpu().tolist(),
             "shape": list(action_vec.shape),
@@ -180,21 +207,19 @@ class BesoPolicyNode:
 
     def run(self) -> None:
         self._running = True
-        dt = 1.0 / self.cfg.fps if self.cfg.fps > 0 else 0.0
 
         while self._running:
-            start = time.perf_counter()
             try:
-                self.step()
+                obs_msg = self._obs_queue.get()
+                if obs_msg is None:
+                    break
+                self._process_observation(obs_msg)
             except Exception as exc:
                 pyzlc.error(f"beso_policy_node step error: {exc}")
-            if dt > 0:
-                elapsed = time.perf_counter() - start
-                if elapsed < dt:
-                    pyzlc.sleep(dt - elapsed)
 
     def stop(self) -> None:
         self._running = False
+        self._obs_queue.put(None)
 
 
 def _cfg_get(cfg: DictConfig, key: str, default: Any = None) -> Any:
@@ -211,7 +236,6 @@ def _build_node_cfg(cfg: DictConfig) -> BesoPolicyNodeConfig:
         sampling_steps=_cfg_get(cfg, "sampling_steps", None),
         obs_topic=str(_cfg_get(cfg, "obs_topic", "beso/observation")),
         action_topic=str(_cfg_get(cfg, "action_topic", "beso/action")),
-        fps=float(_cfg_get(cfg, "fps", 30.0)),
         pyzlc_name=str(_cfg_get(cfg, "pyzlc_name", "beso_policy_node")),
         pyzlc_host=str(_cfg_get(cfg, "pyzlc_host")),
         pyzlc_group=str(_cfg_get(cfg, "pyzlc_group", "224.0.0.1")),

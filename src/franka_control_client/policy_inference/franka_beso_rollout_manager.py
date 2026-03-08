@@ -103,7 +103,6 @@ class FrankaBesoRolloutManager:
         self.control_pair = control_pair
         self.cfg = cfg
         self.fps = int(cfg.fps)
-        self.last_timestamp: Optional[float] = None
 
         self.policy = RemotePolicy(
             cfg.policy_name, obs_topic=cfg.obs_topic, action_topic=cfg.action_topic
@@ -152,8 +151,11 @@ class FrankaBesoRolloutManager:
             raise ValueError("Missing PandaGripperDataWrapper for rollout.")
 
         self._need_policy_reset = False
-        self._rollout_start_wall_ts = 0.0
-        self._last_action_ts = 0.0
+        self._rollout_id: Optional[int] = None
+        self._next_obs_seq = 0
+        self._pending_obs_seq: Optional[int] = None
+        self._pending_state_vec: Optional[np.ndarray] = None
+        self._pending_image_arrays: Optional[Dict[str, np.ndarray]] = None
         self._closed = False
 
         self._record_enable = bool(cfg.record_enable)
@@ -204,10 +206,12 @@ class FrankaBesoRolloutManager:
 
     def _start_rollout(self) -> None:
         self._ui_console.update_hint("Starting rollout...")
-        self.last_timestamp = None
         self._need_policy_reset = True
-        self._rollout_start_wall_ts = time.time()
-        self._last_action_ts = self._rollout_start_wall_ts
+        self._rollout_id = time.time_ns()
+        self._next_obs_seq = 0
+        self._pending_obs_seq = None
+        self._pending_state_vec = None
+        self._pending_image_arrays = None
         self._start_recording_episode()
         self._start_rollout_event.emit()
 
@@ -227,42 +231,80 @@ class FrankaBesoRolloutManager:
         self._finalize_recorder()
         self._ui_console.update_hint("Rollout manager closed.")
 
-    def _rollout_step(self) -> None:
-        if self.last_timestamp is None:
-            self.last_timestamp = time.perf_counter()
+    def _try_consume_pending_action(self) -> bool:
+        if self._pending_obs_seq is None:
+            return False
+
+        action_msg = self.policy.current_action
+        if action_msg is None:
+            return False
+        if action_msg["rollout_id"] != self._rollout_id:
+            return False
+        if int(action_msg["source_obs_seq"]) != self._pending_obs_seq:
+            return False
+
+        action = np.asarray(action_msg["action"], dtype=np.float64).reshape(-1)
+        self.control_pair.update_action(action)
+        if self._pending_state_vec is not None and self._pending_image_arrays is not None:
+            self._record_step(
+                self._pending_state_vec,
+                self._pending_image_arrays,
+                action,
+            )
+
+        self._pending_obs_seq = None
+        self._pending_state_vec = None
+        self._pending_image_arrays = None
+        return True
+
+    def _send_next_observation(self) -> None:
+        rollout_id = self._rollout_id
+        if rollout_id is None:
+            raise RuntimeError("rollout_id is not initialized before sending observations.")
 
         state_vec = self._build_state_vector()
         image_arrays = self._capture_image_arrays()
+        obs_seq = self._next_obs_seq
         obs = self._build_observation(
+            rollout_id=rollout_id,
+            obs_seq=obs_seq,
+            obs_timestamp=time.time(),
             state_vec=state_vec,
             image_arrays=image_arrays,
             reset_policy=self._need_policy_reset,
         )
-        self._need_policy_reset = False
         self.policy.send_observation(obs)
+        self._need_policy_reset = False
+        self._pending_obs_seq = obs_seq
+        self._pending_state_vec = state_vec
+        self._pending_image_arrays = image_arrays
+        self._next_obs_seq += 1
 
-        action_msg = self.policy.current_action
-        if action_msg is not None:
-            action_ts = float(action_msg["timestamp"])
-            if action_ts >= self._rollout_start_wall_ts and action_ts >= self._last_action_ts:
-                action = np.asarray(action_msg["action"], dtype=np.float64).reshape(-1)
-                self.control_pair.update_action(action)
-                self._record_step(state_vec, image_arrays, action)
-                self._last_action_ts = action_ts
+    def _rollout_step(self) -> None:
+        cycle_start = time.perf_counter()
 
-        elapsed = time.perf_counter() - self.last_timestamp
+        self._try_consume_pending_action()
+        if self._pending_obs_seq is None:
+            self._send_next_observation()
+
+        elapsed = time.perf_counter() - cycle_start
         sleep_time = max(0.0, (1.0 / self.fps) - elapsed)
         if sleep_time > 0.0:
             pyzlc.sleep(sleep_time)
-        self.last_timestamp = time.perf_counter()
 
     def _build_observation(
         self,
+        rollout_id: int,
+        obs_seq: int,
+        obs_timestamp: float,
         state_vec: np.ndarray,
         image_arrays: Dict[str, np.ndarray],
         reset_policy: bool,
     ) -> Dict[str, Any]:
         return {
+            "rollout_id": rollout_id,
+            "obs_seq": obs_seq,
+            "obs_timestamp": obs_timestamp,
             "state": state_vec.tolist(),
             "images": self._encode_images_for_policy(image_arrays),
             "task": self.cfg.task,
