@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import queue
 import random
@@ -108,40 +107,29 @@ class BesoPolicyNode:
         return arr.reshape((h, w, c)).copy()
 
     def _load_policy(self):
-        from lerobot.configs.policies import PreTrainedConfig
         from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
-        from policies.beso.beso_config import BESO_CONFIG_NAME
+        from policies.beso.beso_config import BesoConfig
         from policies.beso.modelling_beso import BesoPolicy
 
         ckpt = Path(self.cfg.checkpoint_path).expanduser().resolve()
         stats_root = Path(self.cfg.stats_data_dir).expanduser().resolve()
 
-        weight_name = "model_non_ema.safetensors" if self.cfg.use_non_ema else "model.safetensors"
-        weight_path = ckpt / weight_name
-
         device = torch.device(self.cfg.device)
 
-        with (stats_root / "meta" / "stats.json").open("r", encoding="utf-8") as f:
-            dataset_stats = json.load(f)
-
-        model_cfg = PreTrainedConfig.from_pretrained(ckpt)
-
-        beso_cfg = ckpt / BESO_CONFIG_NAME
-        if beso_cfg.exists():
-            with beso_cfg.open("r", encoding="utf-8") as f:
-                extra = json.load(f)
-            for k, v in extra.items():
-                setattr(model_cfg, k, v)
-
+        model_cfg = BesoConfig.from_pretrained(ckpt)
         model_cfg.device = str(device)
+        model_cfg.load_non_ema = bool(self.cfg.use_non_ema)
 
         ds_meta = LeRobotDatasetMetadata(
             repo_id=self.cfg.dataset_repo_id,
             root=stats_root,
         )
-
-        policy = BesoPolicy(config=model_cfg, dataset_meta=ds_meta, dataset_stats=dataset_stats)
-        policy = BesoPolicy._load_as_safetensor(policy, str(weight_path), str(device), strict=False)
+        policy = BesoPolicy.from_pretrained(
+            ckpt,
+            config=model_cfg,
+            dataset_meta=ds_meta,
+            strict=False,
+        )
         policy = policy.to(device)
         policy.eval()
 
