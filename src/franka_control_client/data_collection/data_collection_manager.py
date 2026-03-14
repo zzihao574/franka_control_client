@@ -144,17 +144,12 @@ class DataCollectionManager(abc.ABC):
                     key = kp.get_data()
                     if key:
                         self._handle_keypress(key)
-                    if (
-                        self._state_machine.state
-                        == DataCollectionState.COLLECTING
-                    ):
+                    if self._state_machine.state == DataCollectionState.COLLECTING:
                         self._collect_step()
-                    if (
-                        self._state_machine.state
-                        == DataCollectionState.STOPPED
-                    ):
+                    elif self._state_machine.state == DataCollectionState.STOPPED:
                         self._reset_to_waiting()
-                    # time.sleep(0.001)
+                    else:
+                        time.sleep(0.01)        
         finally:
             self._close()
 

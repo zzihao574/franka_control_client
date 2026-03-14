@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     name = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     data_collection_manager = LeRobotDataCollection(
-        data_collectors, f"/home/irl-admin/zihao_zhang/datasets/{name}", task="pick_and_place"
+        data_collectors, f"/home/irl-admin/zihao_zhang/datasets/{name}", task="pick_and_place", fps=30
     )
 
     data_collection_manager.register_start_collecting_event(
