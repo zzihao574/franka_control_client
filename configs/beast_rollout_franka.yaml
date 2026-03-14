@@ -1,0 +1,39 @@
+policy_node:
+  lerobot_repo_root: /home/zzh/workspace/Robot_learning/lerobot-irl-models-beast/lerobot-irl-models
+  checkpoint_path: /home/zzh/workspace/Robot_learning/lerobot-irl-models-beast/lerobot-irl-models/output/beastf/model_outputs/checkpoints/last/pretrained_model
+  dataset_root: /home/zzh/workspace/Robot_learning/datasets/fold_the_towel_all
+  task: "fold the towel"
+  device: cuda
+  obs_topic: beast/observation
+  action_topic: beast/action
+  pyzlc_name: beast_policy_node
+  pyzlc_host: 141.3.53.25
+  pyzlc_group: 224.0.0.1
+  pyzlc_group_name: realrobot_rollout
+  pyzlc_group_port: 7731
+  seed: 42
+
+rollout_node:
+  pyzlc_name: franka_rollout_node
+  pyzlc_host: 141.3.53.25
+  pyzlc_group: 224.0.0.1
+  pyzlc_group_name: realrobot_rollout
+  pyzlc_group_port: 7731
+
+  policy_name: beast
+  obs_topic: beast/observation
+  action_topic: beast/action
+  record_enable: false
+  task: "fold the towel"
+  fps: 30.0
+
+  follower_arm: FrankaFollower
+  follower_gripper: FrankaFollowerGripper
+  camera_names:
+    - centric_cam
+    - wrist_cam
+  camera_preview: false
+
+  control_dt_s: 0.033
+  gripper_speed: 0.5
+  align_q: [-0.838027175526648, 0.23739903886903796, 0.998479903707504, -1.9307362981093554, -0.1399801990323587, 2.0812839427259235, 1.0100087088974428]
