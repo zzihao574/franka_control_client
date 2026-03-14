@@ -14,7 +14,7 @@ from franka_control_client.control_pair.rollout_single_franka_control_pair impor
 from franka_control_client.franka_robot.franka_panda import FrankaPanda
 from franka_control_client.franka_robot.panda_arm import RemotePandaArm, ControlMode
 from franka_control_client.franka_robot.panda_gripper import RemotePandaGripper
-from franka_control_client.policy_inference.franka_beso_rollout_manager import (
+from franka_control_client.policy_inference.franka_beast_rollout_manager import (
     FrankaBesoRolloutConfig as FrankaRolloutConfig,
     FrankaBesoRolloutManager as FrankaRolloutManager,
 )

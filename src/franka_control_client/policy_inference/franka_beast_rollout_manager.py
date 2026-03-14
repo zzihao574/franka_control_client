@@ -24,7 +24,7 @@ from ..control_pair.rollout_single_franka_control_pair import (
 from ..policy.policy import RemotePolicy
 
 RECORD_DATA_ROOT = str(
-    (Path(__file__).resolve().parents[3] / "data" / "beso_rollout_records").resolve()
+    (Path(__file__).resolve().parents[3] / "data" / "beast_rollout_records").resolve()
 )
 
 
@@ -83,7 +83,7 @@ class RolloutStateMachine:
 
 
 @dataclass
-class FrankaBesoRolloutConfig:
+class FrankaBeastRolloutConfig:
     policy_name: str
     task: str
     fps: int = 30
@@ -92,12 +92,12 @@ class FrankaBesoRolloutConfig:
     record_enable: bool = False
 
 
-class FrankaBesoRolloutManager:
+class FrankaBeastRolloutManager:
     def __init__(
         self,
         obs_sources: List[IRL_HardwareDataWrapper],
         control_pair: RolloutSingleFrankaControlPair,
-        cfg: FrankaBesoRolloutConfig,
+        cfg: FrankaBeastRolloutConfig,
     ) -> None:
         self.obs_sources = obs_sources
         self.control_pair = control_pair
