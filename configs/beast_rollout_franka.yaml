@@ -1,6 +1,6 @@
 policy_node:
   lerobot_repo_root: /home/multimodallearning/Jing/lerobot-irl-models
-  checkpoint_path: /home/multimodallearning/Jing/lerobot-irl-models/outputs/030000/pretrained_model
+  checkpoint_path: /home/multimodallearning/Jing/lerobot-irl-models/outputs/beastf/beastf_banana_checkpoint_123000/123000/pretrained_model
   dataset_root: /home/multimodallearning/Jing/lerobot-irl-models/data/banana_beso_all
   task: "fold the towel"
   device: cuda
