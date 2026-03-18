@@ -243,6 +243,13 @@ class BeastPolicyNode:
 
             batch[key] = self._image_to_tensor(image, expected_channels=shape[0])
 
+        state = obs_msg.get("state")
+        if state is not None:
+            state_tensor = torch.as_tensor(state, dtype=torch.float32)
+            if state_tensor.ndim == 1:
+                state_tensor = state_tensor.unsqueeze(0)
+            batch["observation.state"] = state_tensor
+
         batch["task"] = self.task
         return batch
 
