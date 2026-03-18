@@ -36,7 +36,6 @@ def set_seed_everywhere(seed: int) -> None:
 class BeastPolicyNodeConfig:
     checkpoint_path: str
     dataset_root: str
-    task: str
     device: str
     obs_topic: str
     action_topic: str
@@ -67,7 +66,7 @@ class BeastPolicyNode:
         pyzlc.register_subscriber_handler(self.cfg.obs_topic, self._on_observation)
         self._action_pub = pyzlc.Publisher(self.cfg.action_topic)
 
-        self.policy, self.device = self._load_policy()
+        self.policy, self.device, self.task = self._load_policy()
         self.policy.reset()
 
     def _clear_pending_observations(self) -> None:
@@ -115,12 +114,28 @@ class BeastPolicyNode:
 
         return stats
 
+    def _resolve_task(self) -> str:
+        import pandas as pd
+
+        dataset_root = Path(self.cfg.dataset_root).expanduser().resolve()
+        tasks_path = dataset_root / "meta" / "tasks.parquet"
+        if not tasks_path.is_file():
+            raise FileNotFoundError(f"tasks.parquet not found: {tasks_path}")
+
+        tasks = pd.read_parquet(tasks_path)
+        task_list = [str(task).strip() for task in tasks.index.tolist() if str(task).strip()]
+        unique_tasks = list(dict.fromkeys(task_list))
+        if len(unique_tasks) != 1:
+            raise ValueError(
+                f"Expected exactly one task in {tasks_path}, got {len(unique_tasks)}: {unique_tasks}"
+            )
+        return unique_tasks[0]
+
     def _load_policy(self):
         from policies.beastf.beastf_config import BeastVLAConfig
         from policies.beastf.modeling_beastf import BeastVLAPolicy
 
-        if not self.cfg.task.strip():
-            raise ValueError("policy_node.task must be a non-empty string")
+        task = self._resolve_task()
 
         ckpt = Path(self.cfg.checkpoint_path).expanduser().resolve()
         if not ckpt.is_dir():
@@ -151,13 +166,13 @@ class BeastPolicyNode:
             ckpt,
             config=model_cfg,
             dataset_stats=stats,
-            task=self.cfg.task,
+            task=task,
             strict=False,
         )
         policy = policy.to(device)
         policy.eval()
 
-        return policy, device
+        return policy, device, task
 
     def _decode_image(self, img: Any) -> np.ndarray:
         if isinstance(img, np.ndarray):
@@ -241,7 +256,7 @@ class BeastPolicyNode:
 
             batch[key] = self._image_to_tensor(image, expected_shape=shape)
 
-        batch["task"] = self.cfg.task
+        batch["task"] = self.task
         return batch
 
     def _process_observation(self, obs_msg: dict[str, Any]) -> None:
@@ -292,7 +307,6 @@ def _build_node_cfg(cfg: DictConfig) -> BeastPolicyNodeConfig:
     return BeastPolicyNodeConfig(
         checkpoint_path=str(cfg.checkpoint_path),
         dataset_root=str(cfg.dataset_root),
-        task=str(cfg.task),
         device=str(cfg.device),
         obs_topic=str(cfg.obs_topic),
         action_topic=str(cfg.action_topic),
@@ -329,6 +343,14 @@ def main(cfg: DictConfig) -> None:
     set_seed_everywhere(node_cfg.seed)
 
     node = BeastPolicyNode(node_cfg)
+    log.info(
+        "Beast policy node started successfully. checkpoint=%s device=%s task=%s obs_topic=%s action_topic=%s",
+        node_cfg.checkpoint_path,
+        node_cfg.device,
+        node.task,
+        node_cfg.obs_topic,
+        node_cfg.action_topic,
+    )
     try:
         node.run()
     except KeyboardInterrupt:
