@@ -17,7 +17,6 @@ import hydra
 import numpy as np
 import pyzlc
 import torch
-import torch.nn.functional as F
 from omegaconf import DictConfig
 
 
@@ -205,29 +204,17 @@ class BeastPolicyNode:
         self,
         image: np.ndarray,
         *,
-        expected_shape: tuple[int, int, int],
+        expected_channels: int,
     ) -> torch.Tensor:
-        c, target_h, target_w = expected_shape
-
         if image.ndim != 3:
             raise ValueError(f"Expected HWC image array, got shape {image.shape}")
-        if image.shape[2] != c:
+        if image.shape[2] != expected_channels:
             raise ValueError(
-                f"Image channel mismatch: got {image.shape[2]}, expected {c}"
+                f"Image channel mismatch: got {image.shape[2]}, expected {expected_channels}"
             )
 
         chw = np.transpose(image.astype(np.float32) / 255.0, (2, 0, 1)).copy()
         tensor = torch.from_numpy(chw).unsqueeze(0)  # [1, C, H, W]
-
-        _, _, h, w = tensor.shape
-        if (h, w) != (target_h, target_w):
-            tensor = F.interpolate(
-                tensor,
-                size=(target_h, target_w),
-                mode="bilinear",
-                align_corners=False,
-            )
-
         return tensor.to(self.device)
 
     def _build_policy_input(self, obs_msg: dict[str, Any]) -> dict[str, Any]:
@@ -254,7 +241,7 @@ class BeastPolicyNode:
             if len(shape) != 3:
                 raise ValueError(f"Invalid visual feature shape for {key}: {shape}")
 
-            batch[key] = self._image_to_tensor(image, expected_shape=shape)
+            batch[key] = self._image_to_tensor(image, expected_channels=shape[0])
 
         batch["task"] = self.task
         return batch
