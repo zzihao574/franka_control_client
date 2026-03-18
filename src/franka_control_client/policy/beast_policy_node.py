@@ -44,6 +44,7 @@ class BeastPolicyNodeConfig:
     pyzlc_group_name: str
     pyzlc_group_port: int
     seed: int
+    debug_print_control_points: bool = False
 
 
 class BeastPolicyNode:
@@ -54,6 +55,8 @@ class BeastPolicyNode:
         self._obs_seq_lock = threading.Lock()
         self._active_rollout_id: int | None = None
         self._last_enqueued_obs_seq: int | None = None
+        self._state_mean: torch.Tensor | None = None
+        self._state_std: torch.Tensor | None = None
 
         pyzlc.init(
             self.cfg.pyzlc_name,
@@ -144,6 +147,10 @@ class BeastPolicyNode:
 
         stats = self._load_stats()
         device = torch.device(self.cfg.device)
+        state_stats = stats.get("observation.state")
+        if state_stats is not None and "mean" in state_stats and "std" in state_stats:
+            self._state_mean = torch.as_tensor(state_stats["mean"], dtype=torch.float32, device=device)
+            self._state_std = torch.as_tensor(state_stats["std"], dtype=torch.float32, device=device)
 
         model_cfg = BeastVLAConfig.from_pretrained(ckpt)
         model_cfg.device = str(device)
@@ -170,6 +177,7 @@ class BeastPolicyNode:
         )
         policy = policy.to(device)
         policy.eval()
+        policy.model.debug_print_control_points = self.cfg.debug_print_control_points
 
         return policy, device, task
 
@@ -245,9 +253,11 @@ class BeastPolicyNode:
 
         state = obs_msg.get("state")
         if state is not None:
-            state_tensor = torch.as_tensor(state, dtype=torch.float32)
+            state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device)
             if state_tensor.ndim == 1:
                 state_tensor = state_tensor.unsqueeze(0)
+            if self._state_mean is not None and self._state_std is not None:
+                state_tensor = (state_tensor - self._state_mean) / (self._state_std + 1e-8)
             batch["observation.state"] = state_tensor
 
         batch["task"] = self.task
@@ -310,6 +320,7 @@ def _build_node_cfg(cfg: DictConfig) -> BeastPolicyNodeConfig:
         pyzlc_group_name=str(cfg.pyzlc_group_name),
         pyzlc_group_port=int(cfg.pyzlc_group_port),
         seed=int(cfg.seed),
+        debug_print_control_points=bool(cfg.get("debug_print_control_points", False)),
     )
 
 
