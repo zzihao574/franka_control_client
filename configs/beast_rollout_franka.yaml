@@ -1,7 +1,7 @@
 policy_node:
   lerobot_repo_root: /home/multimodallearning/Jing/lerobot-irl-models
-  checkpoint_path: /home/multimodallearning/Jing/lerobot-irl-models/outputs/beastf/beastf_banana_checkpoint_123000/123000/pretrained_model
-  dataset_root: /home/zzh/workspace/Robot_learning/datasets/fold_the_towel_all
+  checkpoint_path: /home/multimodallearning/Jing/checkpoints/beastf/17.03/checkpoints/060000/pretrained_model
+  dataset_root: /home/multimodallearning/Jing/dataset/fold_the_towel_all/home/jing/zihao_zhang/fold_the_towel_all
   device: cuda
   obs_topic: beast/observation
   action_topic: beast/action
@@ -23,7 +23,7 @@ rollout_node:
   obs_topic: beast/observation
   action_topic: beast/action
   record_enable: false
-  fps: 30.0
+  fps: 15.0
 
   follower_arm: FrankaFollower
   follower_gripper: FrankaFollowerGripper
@@ -34,5 +34,11 @@ rollout_node:
 
   control_dt_s: 0.033
   gripper_speed: 0.5
-  align_q: [-0.238135, -0.036628, 0.298702, -2.131368, 0.109387, 2.111649, 0.850056, 0.069985]
+  align_q: [-0.238027175526648,
+   -0.03739903886903796,
+   0.298479903707504,
+   -2.1307362981093554,
+   0.1099801990323587,
+   2.1112839427259235,
+   0.850087088974428]
 
