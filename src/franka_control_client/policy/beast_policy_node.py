@@ -36,6 +36,7 @@ class BeastPolicyNodeConfig:
     checkpoint_path: str
     dataset_root: str
     device: str
+    enforce_init_pos: bool
     obs_topic: str
     action_topic: str
     pyzlc_name: str
@@ -154,6 +155,7 @@ class BeastPolicyNode:
 
         model_cfg = BeastVLAConfig.from_pretrained(ckpt)
         model_cfg.device = str(device)
+        model_cfg.enforce_init_pos = self.cfg.enforce_init_pos
 
         if getattr(model_cfg, "return_act_chunk", False):
             raise ValueError(
@@ -312,6 +314,7 @@ def _build_node_cfg(cfg: DictConfig) -> BeastPolicyNodeConfig:
         checkpoint_path=str(cfg.checkpoint_path),
         dataset_root=str(cfg.dataset_root),
         device=str(cfg.device),
+        enforce_init_pos=bool(cfg.get("enforce_init_pos", True)),
         obs_topic=str(cfg.obs_topic),
         action_topic=str(cfg.action_topic),
         pyzlc_name=str(cfg.pyzlc_name),

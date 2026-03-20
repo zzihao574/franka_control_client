@@ -3,6 +3,7 @@ policy_node:
   checkpoint_path: /home/multimodallearning/Jing/checkpoints/beastf/17.03/checkpoints/060000/pretrained_model
   dataset_root: /home/multimodallearning/Jing/dataset/fold_the_towel_all/home/jing/zihao_zhang/fold_the_towel_all
   device: cuda
+  enforce_init_pos: true
   debug_print_control_points: false
   obs_topic: beast/observation
   action_topic: beast/action
