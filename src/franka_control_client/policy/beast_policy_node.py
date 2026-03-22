@@ -23,6 +23,15 @@ from omegaconf import DictConfig
 log = logging.getLogger(__name__)
 
 
+def _normalization_mode(mapping: Any, feature: str, default: str = "IDENTITY") -> str:
+    if mapping is None:
+        return default
+    for key, value in mapping.items():
+        if str(getattr(key, "value", key)) == feature:
+            return str(getattr(value, "value", value))
+    return default
+
+
 def set_seed_everywhere(seed: int) -> None:
     random.seed(seed)
     np.random.seed(seed)
@@ -58,6 +67,7 @@ class BeastPolicyNode:
         self._last_enqueued_obs_seq: int | None = None
         self._state_mean: torch.Tensor | None = None
         self._state_std: torch.Tensor | None = None
+        self._state_norm_mode = "IDENTITY"
 
         pyzlc.init(
             self.cfg.pyzlc_name,
@@ -156,6 +166,10 @@ class BeastPolicyNode:
         model_cfg = BeastVLAConfig.from_pretrained(ckpt)
         model_cfg.device = str(device)
         model_cfg.enforce_init_pos = self.cfg.enforce_init_pos
+        self._state_norm_mode = _normalization_mode(
+            getattr(model_cfg, "normalization_mapping", None),
+            "STATE",
+        )
 
         if getattr(model_cfg, "return_act_chunk", False):
             raise ValueError(
@@ -262,7 +276,11 @@ class BeastPolicyNode:
             state_tensor = torch.as_tensor(state, dtype=torch.float32, device=self.device)
             if state_tensor.ndim == 1:
                 state_tensor = state_tensor.unsqueeze(0)
-            if self._state_mean is not None and self._state_std is not None:
+            if self._state_norm_mode == "MEAN_STD":
+                if self._state_mean is None or self._state_std is None:
+                    raise RuntimeError(
+                        "STATE normalization is MEAN_STD, but observation.state mean/std are missing."
+                    )
                 state_tensor = (state_tensor - self._state_mean) / (self._state_std + 1e-8)
             batch["observation.state"] = state_tensor
 

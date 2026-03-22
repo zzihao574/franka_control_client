@@ -86,10 +86,11 @@ class RolloutStateMachine:
 class FrankaBeastRolloutConfig:
     policy_name: str
     task: str
-    fps: int = 30
     obs_topic: Optional[str] = None
     action_topic: Optional[str] = None
     record_enable: bool = False
+    joint_target_tolerance: float = 0.03
+    gripper_target_tolerance: float = 0.005
 
 
 class FrankaBeastRolloutManager:
@@ -102,7 +103,6 @@ class FrankaBeastRolloutManager:
         self.obs_sources = obs_sources
         self.control_pair = control_pair
         self.cfg = cfg
-        self.fps = int(cfg.fps)
 
         self.policy = RemotePolicy(
             cfg.policy_name, obs_topic=cfg.obs_topic, action_topic=cfg.action_topic
@@ -156,7 +156,16 @@ class FrankaBeastRolloutManager:
         self._pending_obs_seq: Optional[int] = None
         self._pending_state_vec: Optional[np.ndarray] = None
         self._pending_image_arrays: Optional[Dict[str, np.ndarray]] = None
+        self._current_target_action: Optional[np.ndarray] = None
         self._closed = False
+        self._poll_sleep_s = min(
+            max(self.control_pair.control_dt_s * 0.25, 0.002),
+            0.01,
+        )
+        self._record_fps = max(
+            1,
+            int(round(1.0 / max(self.control_pair.control_dt_s, 1e-6))),
+        )
 
         self._record_enable = bool(cfg.record_enable)
         self._dataset = None
@@ -212,6 +221,7 @@ class FrankaBeastRolloutManager:
         self._pending_obs_seq = None
         self._pending_state_vec = None
         self._pending_image_arrays = None
+        self._current_target_action = None
         self._start_recording_episode()
         self._start_rollout_event.emit()
 
@@ -245,6 +255,7 @@ class FrankaBeastRolloutManager:
 
         action = np.asarray(action_msg["action"], dtype=np.float64).reshape(-1)
         self.control_pair.update_action(action)
+        self._current_target_action = action.copy()
         if self._pending_state_vec is not None and self._pending_image_arrays is not None:
             self._record_step(
                 self._pending_state_vec,
@@ -256,6 +267,19 @@ class FrankaBeastRolloutManager:
         self._pending_state_vec = None
         self._pending_image_arrays = None
         return True
+
+    def _is_current_target_reached(self) -> bool:
+        if self._current_target_action is None:
+            return True
+
+        state_vec = self._build_state_vector().astype(np.float64, copy=False)
+        action = self._current_target_action
+        joint_err = float(np.max(np.abs(state_vec[:7] - action[:7])))
+        gripper_err = abs(float(state_vec[7]) - float(action[7]))
+        return (
+            joint_err <= float(self.cfg.joint_target_tolerance)
+            and gripper_err <= float(self.cfg.gripper_target_tolerance)
+        )
 
     def _send_next_observation(self) -> None:
         rollout_id = self._rollout_id
@@ -281,16 +305,12 @@ class FrankaBeastRolloutManager:
         self._next_obs_seq += 1
 
     def _rollout_step(self) -> None:
-        cycle_start = time.perf_counter()
-
         self._try_consume_pending_action()
         if self._pending_obs_seq is None:
-            self._send_next_observation()
+            if self._current_target_action is None or self._is_current_target_reached():
+                self._send_next_observation()
 
-        elapsed = time.perf_counter() - cycle_start
-        sleep_time = max(0.0, (1.0 / self.fps) - elapsed)
-        if sleep_time > 0.0:
-            pyzlc.sleep(sleep_time)
+        pyzlc.sleep(self._poll_sleep_s)
 
     def _build_observation(
         self,
@@ -367,7 +387,7 @@ class FrankaBeastRolloutManager:
         self._dataset = LeRobotDataset.create(
             repo_id=str(record_dir),
             features=features,
-            fps=self.fps,
+            fps=self._record_fps,
         )
         self._dataset.meta.metadata_buffer_size = 1
         pyzlc.info(f"Recording dataset dir: {record_dir}")

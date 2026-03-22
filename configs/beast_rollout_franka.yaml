@@ -25,7 +25,8 @@ rollout_node:
   obs_topic: beast/observation
   action_topic: beast/action
   record_enable: false
-  fps: 30.0
+  joint_target_tolerance: 0.01
+  gripper_target_tolerance: 0.01
 
   follower_arm: FrankaFollower
   follower_gripper: FrankaFollowerGripper

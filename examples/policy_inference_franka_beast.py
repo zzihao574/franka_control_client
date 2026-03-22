@@ -92,10 +92,11 @@ def main() -> None:
     rollout_cfg = FrankaRolloutConfig(
         policy_name=cfg["policy_name"],
         task=str(cfg.get("task", "")),
-        fps=int(cfg["fps"]),
         obs_topic=cfg["obs_topic"],
         action_topic=cfg["action_topic"],
         record_enable=record_enable,
+        joint_target_tolerance=float(cfg.get("joint_target_tolerance", 0.03)),
+        gripper_target_tolerance=float(cfg.get("gripper_target_tolerance", 0.005)),
     )
     manager = FrankaRolloutManager(
         obs_sources=obs_sources,
