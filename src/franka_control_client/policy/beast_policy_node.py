@@ -247,7 +247,11 @@ class BeastPolicyNode:
                 raise KeyError(f"Camera '{cam_name}' missing in observation images")
 
             image = self._decode_image(images[cam_name])
-            shape = tuple(feat.shape)
+            if isinstance(feat, dict):
+                shape = tuple(feat["shape"])
+            else:
+                shape = tuple(feat.shape)
+
             if len(shape) != 3:
                 raise ValueError(f"Invalid visual feature shape for {key}: {shape}")
 
@@ -352,10 +356,9 @@ def main(cfg: DictConfig) -> None:
 
     node = BeastPolicyNode(node_cfg)
     log.info(
-        "Beast policy node started successfully. checkpoint=%s device=%s task=%s obs_topic=%s action_topic=%s",
+        "Beast policy node started successfully. checkpoint=%s device=%s obs_topic=%s action_topic=%s",
         node_cfg.checkpoint_path,
         node_cfg.device,
-        node.task,
         node_cfg.obs_topic,
         node_cfg.action_topic,
     )

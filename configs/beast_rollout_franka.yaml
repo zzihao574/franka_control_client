@@ -1,6 +1,6 @@
 policy_node:
   lerobot_repo_root: /home/multimodallearning/Jing/lerobot-irl-models
-  checkpoint_path: /home/multimodallearning/Jing/checkpoints/beastf/17.03/checkpoints/060000/pretrained_model
+  checkpoint_path: /home/multimodallearning/Jing/checkpoints/beastf/21_3/150000/pretrained_model
   dataset_root: /home/multimodallearning/Jing/dataset/fold_the_towel_all/home/jing/zihao_zhang/fold_the_towel_all
   device: cuda
   enforce_init_pos: true
@@ -25,7 +25,7 @@ rollout_node:
   obs_topic: beast/observation
   action_topic: beast/action
   record_enable: false
-  fps: 15.0
+  fps: 30.0
 
   follower_arm: FrankaFollower
   follower_gripper: FrankaFollowerGripper
